@@ -7,68 +7,179 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
     <style>
         :root { --bg-color: #0f172a; --card-bg: rgba(30, 41, 59, 0.7); --text-main: #f8fafc; --text-muted: #94a3b8; --neon-blue: #38bdf8; --neon-purple: #c084fc; --neon-green: #34d399; }
         body { background-color: var(--bg-color); color: var(--text-main); font-family: 'Pretendard', sans-serif; overflow-x: hidden; }
-        .glass-card { background: var(--card-bg); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 24px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); }
+        
+        .glass-card { background: var(--card-bg); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 24px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); transition: transform 0.3s; }
+        .glass-card:hover { transform: translateY(-5px); }
+
+        .nav-pills .nav-link { color: var(--text-muted); border-radius: 30px; padding: 10px 24px; margin: 0 5px; font-weight: 600; transition: all 0.4s; }
+        .nav-pills .nav-link.active { background: linear-gradient(135deg, var(--neon-blue), var(--neon-purple)); color: white; box-shadow: 0 4px 15px rgba(56, 189, 248, 0.4); transform: scale(1.05); }
+
         .neon-text { color: transparent; background-clip: text; -webkit-background-clip: text; background-image: linear-gradient(to right, var(--neon-blue), var(--neon-purple)); font-weight: bold; }
+
+        .form-select { background-color: rgba(15, 23, 42, 0.8); color: white; border: 1px solid var(--neon-blue); border-radius: 10px; }
+        .form-select:focus { background-color: rgba(15, 23, 42, 0.9); color: white; box-shadow: 0 0 0 0.25rem rgba(56, 189, 248, 0.25); }
+        
         #loadingScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; background: var(--bg-color); z-index: 1000; }
         .spinner { width: 50px; height: 50px; border: 5px solid rgba(255,255,255,0.1); border-top-color: var(--neon-blue); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
         @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
+
     <div id="loadingScreen">
         <div class="spinner"></div>
-        <h4 class="neon-text" id="loadingText">1. 데이터 요청 준비 중...</h4>
-        <p id="debugLog" class="text-warning mt-3" style="font-family: monospace;"></p>
+        <h4 class="neon-text">유니온 데이터를 동기화 중입니다...</h4>
     </div>
-    
+
     <div class="container py-5 d-none" id="appContent">
-        <h2 class="text-center">✨ 데이터 로딩 성공! ✨</h2>
+        <h2 class="text-center mb-5 fw-bold text-white">✨ 유니온 <span class="neon-text">데이터 대시보드</span></h2>
+
+        <ul class="nav nav-pills justify-content-center mb-5" id="pills-tab" role="tablist">
+            <li class="nav-item" role="presentation"><button class="nav-link active" id="tab-overview" data-bs-toggle="pill" data-bs-target="#overview" type="button" role="tab">🏆 종합</button></li>
+            <li class="nav-item" role="presentation"><button class="nav-link" id="tab-raid" data-bs-toggle="pill" data-bs-target="#raid" type="button" role="tab">⚔️ 레이드</button></li>
+            <li class="nav-item" role="presentation"><button class="nav-link" id="tab-member" data-bs-toggle="pill" data-bs-target="#member" type="button" role="tab">👤 멤버</button></li>
+        </ul>
+
+        <div class="tab-content" id="pills-tabContent">
+            <div class="tab-pane fade show active" id="overview" role="tabpanel">
+                <div class="row g-4 mb-4">
+                    <div class="col-md-6"><div class="glass-card text-center"><h5 class="text-muted mb-2">최근 유니온 랭크</h5><h1 class="display-4 fw-bold text-white"><span id="summaryRank" style="color: var(--neon-green)">0</span><span class="fs-4 text-muted">위</span></h1></div></div>
+                    <div class="col-md-6"><div class="glass-card text-center"><h5 class="text-muted mb-2">모든 시즌 누적 딜량</h5><h1 class="display-4 fw-bold text-white"><span id="summaryDamage" class="neon-text">0</span><span class="fs-4 text-muted">M</span></h1></div></div>
+                </div>
+                <div class="row g-4">
+                    <div class="col-md-6"><div class="glass-card"><canvas id="chartRank"></canvas></div></div>
+                    <div class="col-md-6"><div class="glass-card"><canvas id="chartTotalDmg"></canvas></div></div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="raid" role="tabpanel">
+                <div class="glass-card mb-4">
+                    <div class="row align-items-center">
+                        <div class="col-md-4"><label class="form-label text-muted">시즌 선택</label><select class="form-select" id="seasonSelect" onchange="renderRaid()"></select></div>
+                        <div class="col-md-8 text-md-end mt-3 mt-md-0"><h4 id="raidSummaryText" class="mb-0 text-white">로딩중...</h4></div>
+                    </div>
+                </div>
+                <div class="glass-card"><canvas id="chartRaid"></canvas></div>
+            </div>
+
+            <div class="tab-pane fade" id="member" role="tabpanel">
+                <div class="glass-card mb-4">
+                    <div class="row align-items-center">
+                        <div class="col-md-4"><label class="form-label text-muted">지휘관 검색</label><select class="form-select" id="memberSelect" onchange="renderMember()"></select></div>
+                        <div class="col-md-8 text-md-end mt-3 mt-md-0"><h4 id="memberSummaryText" class="mb-0 text-white">로딩중...</h4></div>
+                    </div>
+                </div>
+                <div class="glass-card"><canvas id="chartMember"></canvas></div>
+            </div>
+        </div>
     </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
         // =========================================================================
-        const BASE_API_URL = "https://script.google.com/macros/s/AKfycbxAqN1LQ-oo2eNmdHjr2GsY2riBLjyAXeDYFk9dmbqTdQsddRGbPatENt5wDkY43JBHrg/exec"; 
+        // 🚨 여기에 구글 API URL (https://script...) 을 붙여넣으세요!
         // =========================================================================
+        const BASE_API_URL = "https://script.google.com/macros/s/AKfycbxAqN1LQ-oo2eNmdHjr2GsY2riBLjyAXeDYFk9dmbqTdQsddRGbPatENt5wDkY43JBHrg/exec"; 
+        
+        let db = null;
+        let charts = {};
 
-        function logStep(text) {
-            console.log(text);
-            document.getElementById("loadingText").innerText = text;
-        }
+        Chart.defaults.color = '#94a3b8';
+        Chart.defaults.font.family = 'Pretendard';
 
         async function fetchAndInitDashboard() {
             try {
-                logStep("2. 구글 서버로 똑똑 문 두드리는 중...");
-                
-                // 데이터 요청 시작
+                // 방금 성공했던 안전한 방식으로 데이터 요청!
                 const response = await fetch(BASE_API_URL);
-                
-                logStep(`3. 구글 응답 도착! (상태 코드: ${response.status})`);
-                
-                // 데이터를 텍스트로 먼저 받아보기 (에러 방지)
                 const textData = await response.text();
-                console.log("받아온 데이터 원본:", textData.substring(0, 200) + "...");
-
-                logStep("4. 데이터 번역(JSON 변환) 중...");
                 const result = JSON.parse(textData);
 
                 if(!result.success) {
-                    logStep("❌ 구글 서버 내부 에러: " + result.error);
+                    document.getElementById("loadingScreen").innerHTML = `<h4 class="text-danger">오류 발생: ${result.error}</h4>`;
                     return;
                 }
 
-                logStep("✅ 5. 모든 준비 완료! 대시보드 켭니다.");
-                document.getElementById("loadingScreen").style.display = "none";
-                document.getElementById("appContent").classList.remove("d-none");
+                db = result.data;
+
+                // 드롭다운 세팅
+                const seasonSelect = document.getElementById("seasonSelect");
+                [...db.seasons].reverse().forEach(s => seasonSelect.add(new Option("시즌 " + s, s)));
+
+                const membersSet = new Set(db.records.map(r => r.nickname));
+                const memberSelect = document.getElementById("memberSelect");
+                [...membersSet].sort().forEach(m => memberSelect.add(new Option(m, m)));
+
+                // 로딩 창 사라지고 예쁜 대시보드 띄우기 (애니메이션)
+                gsap.to("#loadingScreen", { opacity: 0, duration: 0.5, onComplete: () => {
+                    document.getElementById("loadingScreen").style.display = "none";
+                    document.getElementById("appContent").classList.remove("d-none");
+                    
+                    gsap.from(".glass-card", { y: 40, opacity: 0, duration: 0.8, stagger: 0.1, ease: "back.out(1.5)" });
+                    
+                    renderOverview();
+                    renderRaid();
+                    renderMember();
+                }});
 
             } catch (error) {
+                document.getElementById("loadingScreen").innerHTML = `<h4 class="text-danger">데이터를 불러오지 못했습니다. API 주소를 다시 확인해주세요.</h4>`;
                 console.error(error);
-                logStep("❌ 치명적 오류 발생! F12를 눌러 확인해주세요.");
-                document.getElementById("debugLog").innerText = "에러 내용: " + error.message;
             }
         }
+
+        // --- 차트 그리기 ---
+        function renderOverview() {
+            let ranks = [], damages = [], totalDmg = 0;
+            db.seasons.forEach(s => {
+                ranks.push(db.ranks[s] || null);
+                let sDmg = db.records.filter(r => r.season === s).reduce((sum, r) => sum + r.damage, 0);
+                damages.push(sDmg); totalDmg += sDmg;
+            });
+            const lastSeason = db.seasons[db.seasons.length - 1];
+            
+            gsap.to(document.getElementById("summaryRank"), { innerHTML: db.ranks[lastSeason] || 0, duration: 1.5, snap: { innerHTML: 1 } });
+            gsap.to(document.getElementById("summaryDamage"), { innerHTML: totalDmg, duration: 2, snap: { innerHTML: 1 }, onUpdate: function() { document.getElementById("summaryDamage").innerHTML = Number(this.targets()[0].innerHTML).toLocaleString(); }});
+
+            if(charts.rank) charts.rank.destroy();
+            charts.rank = new Chart(document.getElementById('chartRank'), { type: 'line', data: { labels: db.seasons.map(s => "시즌 " + s), datasets: [{ label: '랭크', data: ranks, borderColor: '#38bdf8', tension: 0.4, borderWidth: 3, pointBackgroundColor: '#fff' }] }, options: { scales: { y: { reverse: true, ticks: { stepSize: 1, precision: 0 } } } } });
+
+            if(charts.totalDmg) charts.totalDmg.destroy();
+            charts.totalDmg = new Chart(document.getElementById('chartTotalDmg'), { type: 'bar', data: { labels: db.seasons.map(s => "시즌 " + s), datasets: [{ label: '총 딜량', data: damages, backgroundColor: '#c084fc', borderRadius: 6 }] } });
+        }
+
+        function renderRaid() {
+            const season = document.getElementById("seasonSelect").value;
+            let userDmg = {};
+            db.records.filter(r => r.season === season).forEach(r => userDmg[r.nickname] = (userDmg[r.nickname] || 0) + r.damage);
+            let users = Object.keys(userDmg).sort((a, b) => userDmg[b] - userDmg[a]);
+            let dmgs = users.map(u => userDmg[u]);
+            document.getElementById("raidSummaryText").innerHTML = `해당 시즌 총 딜량: <span class="neon-text">${dmgs.reduce((a,b)=>a+b,0).toLocaleString()}M</span>`;
+
+            if(charts.raid) charts.raid.destroy();
+            charts.raid = new Chart(document.getElementById('chartRaid'), { type: 'bar', data: { labels: users, datasets: [{ label: '기여 딜량', data: dmgs, backgroundColor: '#34d399', borderRadius: 4 }] } });
+        }
+
+        function renderMember() {
+            const member = document.getElementById("memberSelect").value;
+            let mDamages = [], total = 0;
+            db.seasons.forEach(s => {
+                let d = db.records.filter(r => r.season === s && r.nickname === member).reduce((sum, r) => sum + r.damage, 0);
+                mDamages.push(d); total += d;
+            });
+            document.getElementById("memberSummaryText").innerHTML = `누적 타격: <span class="neon-text">${total.toLocaleString()}M</span>`;
+
+            if(charts.member) charts.member.destroy();
+            charts.member = new Chart(document.getElementById('chartMember'), { type: 'line', data: { labels: db.seasons.map(s => "시즌 " + s), datasets: [{ label: '개인 딜량', data: mDamages, borderColor: '#f472b6', backgroundColor: 'rgba(244, 114, 182, 0.2)', fill: true, tension: 0.4, borderWidth: 3 }] } });
+        }
+
+        document.querySelectorAll('button[data-bs-toggle="pill"]').forEach(btn => {
+            btn.addEventListener('shown.bs.tab', () => gsap.from(".tab-pane.active .glass-card", { y: 20, opacity: 0, duration: 0.5, stagger: 0.1, ease: "power2.out" }));
+        });
 
         document.addEventListener("DOMContentLoaded", fetchAndInitDashboard);
     </script>
