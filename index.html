@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>유니온 대시보드</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+    <style>
+        /* 🌌 다크 & 네온 게이밍 테마 색상 정의 */
+        :root { 
+            --bg-color: #0f172a; 
+            --card-bg: rgba(30, 41, 59, 0.7); 
+            --text-main: #f8fafc; 
+            --text-muted: #94a3b8; 
+            --neon-blue: #38bdf8; 
+            --neon-purple: #c084fc; 
+            --neon-green: #34d399; 
+        }
+        
+        body { 
+            background-color: var(--bg-color); 
+            color: var(--text-main); 
+            font-family: 'Pretendard', -apple-system, sans-serif; 
+            overflow-x: hidden; 
+        }
+
+        /* 🧊 글래스모피즘 (반투명 유리 질감) 카드 */
+        .glass-card { 
+            background: var(--card-bg); 
+            backdrop-filter: blur(12px); 
+            border: 1px solid rgba(255, 255, 255, 0.1); 
+            border-radius: 16px; 
+            padding: 24px; 
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); 
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); 
+        }
+        .glass-card:hover { transform: translateY(-5px); }
+
+        /* 🔘 탭 버튼 디자인 */
+        .nav-pills .nav-link { 
+            color: var(--text-muted); 
+            border-radius: 30px; 
+            padding: 10px 24px; 
+            margin: 0 5px; 
+            font-weight: 600; 
+            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); 
+        }
+        .nav-pills .nav-link.active { 
+            background: linear-gradient(135deg, var(--neon-blue), var(--neon-purple)); 
+            color: white; 
+            box-shadow: 0 4px 15px rgba(56, 189, 248, 0.4); 
+            transform: scale(1.05); 
+        }
+
+        /* ✨ 네온 텍스트 효과 */
+        .neon-text { 
+            color: transparent; 
+            background-clip: text; 
+            -webkit-background-clip: text; 
+            background-image: linear-gradient(to right, var(--neon-blue), var(--neon-purple)); 
+            font-weight: bold; 
+        }
+
+        /* 🔽 드롭다운 및 입력창 스타일 */
+        .form-select, .form-control { 
+            background-color: rgba(15, 23, 42, 0.8); 
+            color: white; 
+            border: 1px solid var(--neon-blue); 
+            border-radius: 10px; 
+        }
+        .form-select:focus, .form-control:focus { 
+            background-color: rgba(15, 23, 42, 0.9); 
+            color: white; 
+            box-shadow: 0 0 0 0.25rem rgba(56, 189, 248, 0.25); 
+        }
+        
+        /* 🔒 로그인 스크린 레이아웃 */
+        #loginScreen { 
+            position: fixed; top: 0; left: 0; width: 100%; height: 100vh; 
+            display: flex; justify-content: center; align-items: center; 
+            background: var(--bg-color); z-index: 1000; 
+        }
+        
+        /* ⏳ 로딩 스피너 애니메이션 */
+        #loadingSpinner { 
+            display: none; margin: 20px auto; width: 40px; height: 40px; 
+            border: 4px solid rgba(255,255,255,0.1); border-top-color: var(--neon-purple); 
+            border-radius: 50%; animation: spin 1s linear infinite; 
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <div id="loginScreen">
+        <div class="glass-card text-center" style="max-width: 400px; width: 90%;">
+            <h3 class="mb-4 text-white fw-bold">✨ <span class="neon-text">유니온 인증</span></h3>
+            <p class="text-muted mb-4">대시보드 접속 코드를 입력해 주세요.</p>
+            <input type="password" id="pwInput" class="form-control text-center mb-3 py-2" placeholder="비밀번호 입력" onkeypress="if(event.key === 'Enter') attemptLogin()">
+            <button class="btn w-100 py-2 text-white fw-bold" style="background: linear-gradient(135deg, var(--neon-blue), var(--neon-purple)); border-radius: 10px;" onclick="attemptLogin()">접속하기</button>
+            <p id="loginError" class="text-danger mt-3 mb-0" style="display: none; font-size: 0.9em;"></p>
+            <div id="loadingSpinner"></div>
+        </div>
+    </div>
+
+    <div class="container py-5 d-none" id="appContent">
+        <h2 class="text-center mb-5 fw-bold text-white">✨ 유니온 <span class="neon-text">데이터 대시보드</span></h2>
+
+        <ul class="nav nav-pills justify-content-center mb-5" id="pills-tab" role="tablist">
+            <li class="nav-item" role="presentation"><button class="nav-link active" id="tab-overview" data-bs-toggle="pill" data-bs-target="#overview" type="button" role="tab">🏆 종합</button></li>
+            <li class="nav-item" role="presentation"><button class="nav-link" id="tab-raid" data-bs-toggle="pill" data-bs-target="#raid" type="button" role="tab">⚔️ 레이드</button></li>
+            <li class="nav-item" role="presentation"><button class="nav-link" id="tab-member" data-bs-toggle="pill" data-bs-target="#member" type="button" role="tab">👤 멤버</button></li>
+        </ul>
+
+        <div class="tab-content" id="pills-tabContent">
+            
+            <div class="tab-pane fade show active" id="overview" role="tabpanel">
+                <div class="row g-4 mb-4">
+                    <div class="col-md-6">
+                        <div class="glass-card text-center">
+                            <h5 class="text-muted mb-2">최근 유니온 랭크</h5>
+                            <h1 class="display-4 fw-bold text-white"><span id="summaryRank" style="color: var(--neon-green)">0</span><span class="fs-4 text-muted">위</span></h1>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="glass-card text-center">
+                            <h5 class="text-muted mb-2">모든 시즌 누적 딜량</h5>
+                            <h1 class="display-4 fw-bold text-white"><span id="summaryDamage" class="neon-text">0</span><span class="fs-4 text-muted">M</span></h1>
+                        </div>
+                    </div>
+                </div>
+                <div class="row g-4">
+                    <div class="col-md-6"><div class="glass-card"><canvas id="chartRank"></canvas></div></div>
+                    <div class="col-md-6"><div class="glass-card"><canvas id="chartTotalDmg"></canvas></div></div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="raid" role="tabpanel">
+                <div class="glass-card mb-4">
+                    <div class="row align-items-center">
+                        <div class="col-md-4">
+                            <label class="form-label text-muted">시즌 선택</label>
+                            <select class="form-select" id="seasonSelect" onchange="renderRaid()"></select>
+                        </div>
+                        <div class="col-md-8 text-md-end mt-3 mt-md-0">
+                            <h4 id="raidSummaryText" class="mb-0 text-white">로딩중...</h4>
+                        </div>
+                    </div>
+                </div>
+                <div class="glass-card"><canvas id="chartRaid"></canvas></div>
+            </div>
+
+            <div class="tab-pane fade" id="member" role="tabpanel">
+                <div class="glass-card mb-4">
+                    <div class="row align-items-center">
+                        <div class="col-md-4">
+                            <label class="form-label text-muted">지휘관 검색</label>
+                            <select class="form-select" id="memberSelect" onchange="renderMember()"></select>
+                        </div>
+                        <div class="col-md-8 text-md-end mt-3 mt-md-0">
+                            <h4 id="memberSummaryText" class="mb-0 text-white">로딩중...</h4>
+                        </div>
+                    </div>
+                </div>
+                <div class="glass-card"><canvas id="chartMember"></canvas></div>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // =========================================================================
+        // 🚨 여기에 구글 API URL (https://script.google.com/macros/s/.../exec) 을 넣으세요!
+        // =========================================================================
+        const BASE_API_URL = "여기에_구글_API_URL을_붙여넣기_하세요"; 
+        
+        let db = null;
+        let charts = {};
+
+        // 차트 기본 다크모드 폰트 색상 세팅
+        Chart.defaults.color = '#94a3b8';
+        Chart.defaults.font.family = 'Pretendard';
+
+        // 🔓 로그인 및 데이터 요청 함수
+        async function attemptLogin() {
+            const pw = document.getElementById("pwInput").value;
+            const errorText = document.getElementById("loginError");
+            const spinner = document.getElementById("loadingSpinner");
+            
+            if(!pw) return;
+
+            errorText.style.display = "none";
+            spinner.style.display = "block";
+
+            try {
+                // API 주소에 비밀번호를 실어서 보냄
+                const response = await fetch(`${BASE_API_URL}?pw=${encodeURIComponent(pw)}`);
+                const result = await response.json();
+                
+                spinner.style.display = "none";
+
+                if(!result.success) {
+                    // 비밀번호 실패 시 진동 애니메이션
+                    errorText.innerText = result.error;
+                    errorText.style.display = "block";
+                    gsap.fromTo("#loginScreen .glass-card", {x: -10}, {x: 10, duration: 0.1, yoyo: true, repeat: 3});
+                    return;
+                }
+
+                // 성공! 데이터를 받아와서 화면을 세팅
+                db = result.data;
+                initDashboardUI();
+
+            } catch (error) {
+                spinner.style.display = "none";
+                errorText.innerText = "서버 연결에 실패했습니다. API 주소를 확인해주세요.";
+                errorText.style.display = "block";
+            }
+        }
+
+        // 🚀 화면 초기화 및 애니메이션 연출
+        function initDashboardUI() {
+            // 드롭다운 메뉴 채우기
+            const seasonSelect = document.getElementById("seasonSelect");
+            [...db.seasons].reverse().forEach(s => seasonSelect.add(new Option("시즌 " + s, s)));
+
+            const membersSet = new Set(db.records.map(r => r.nickname));
+            const memberSelect = document.getElementById("memberSelect");
+            [...membersSet].sort().forEach(m => memberSelect.add(new Option(m, m)));
+
+            // 로그인창 위로 쓱 사라지는 애니메이션
+            gsap.to("#loginScreen", { y: "-100%", opacity: 0, duration: 0.8, ease: "power3.inOut", onComplete: () => {
+                document.getElementById("loginScreen").style.display = "none";
+                document.getElementById("appContent").classList.remove("d-none");
+                
+                // 카드들이 아래에서 쫀득하게 올라오는 애니메이션
+                gsap.from(".glass-card", { y: 40, opacity: 0, duration: 0.8, stagger: 0.1, ease: "back.out(1.5)" });
+                
+                renderOverview();
+                renderRaid();
+                renderMember();
+            }});
+        }
+
+        // 📈 [탭 A] 종합 차트 렌더링
+        function renderOverview() {
+            let ranks = [], damages = [], totalDmg = 0;
+            db.seasons.forEach(s => {
+                ranks.push(db.ranks[s] || null);
+                let sDmg = db.records.filter(r => r.season === s).reduce((sum, r) => sum + r.damage, 0);
+                damages.push(sDmg);
+                totalDmg += sDmg;
+            });
+            const lastSeason = db.seasons[db.seasons.length - 1];
+            
+            // 숫자 카운팅 롤링 애니메이션
+            gsap.to(document.getElementById("summaryRank"), { innerHTML: db.ranks[lastSeason] || 0, duration: 1.5, snap: { innerHTML: 1 } });
+            gsap.to(document.getElementById("summaryDamage"), { innerHTML: totalDmg, duration: 2, snap: { innerHTML: 1 }, onUpdate: function() {
+                document.getElementById("summaryDamage").innerHTML = Number(this.targets()[0].innerHTML).toLocaleString();
+            }});
+
+            if(charts.rank) charts.rank.destroy();
+            charts.rank = new Chart(document.getElementById('chartRank'), { type: 'line', data: { labels: db.seasons.map(s => "시즌 " + s), datasets: [{ label: '랭크', data: ranks, borderColor: '#38bdf8', tension: 0.4, borderWidth: 3, pointBackgroundColor: '#fff' }] }, options: { scales: { y: { reverse: true, ticks: { stepSize: 1, precision: 0 } } } } });
+
+            if(charts.totalDmg) charts.totalDmg.destroy();
+            charts.totalDmg = new Chart(document.getElementById('chartTotalDmg'), { type: 'bar', data: { labels: db.seasons.map(s => "시즌 " + s), datasets: [{ label: '총 딜량', data: damages, backgroundColor: '#c084fc', borderRadius: 6 }] } });
+        }
+
+        // 📈 [탭 B] 레이드 차트 렌더링
+        function renderRaid() {
+            const season = document.getElementById("seasonSelect").value;
+            let userDmg = {};
+            db.records.filter(r => r.season === season).forEach(r => userDmg[r.nickname] = (userDmg[r.nickname] || 0) + r.damage);
+            let users = Object.keys(userDmg).sort((a, b) => userDmg[b] - userDmg[a]);
+            let dmgs = users.map(u => userDmg[u]);
+            document.getElementById("raidSummaryText").innerHTML = `해당 시즌 총 딜량: <span class="neon-text">${dmgs.reduce((a,b)=>a+b,0).toLocaleString()}M</span>`;
+
+            if(charts.raid) charts.raid.destroy();
+            charts.raid = new Chart(document.getElementById('chartRaid'), { type: 'bar', data: { labels: users, datasets: [{ label: '기여 딜량', data: dmgs, backgroundColor: '#34d399', borderRadius: 4 }] } });
+        }
+
+        // 📈 [탭 C] 멤버 차트 렌더링
+        function renderMember() {
+            const member = document.getElementById("memberSelect").value;
+            let mDamages = [], total = 0;
+            db.seasons.forEach(s => {
+                let d = db.records.filter(r => r.season === s && r.nickname === member).reduce((sum, r) => sum + r.damage, 0);
+                mDamages.push(d); total += d;
+            });
+            document.getElementById("memberSummaryText").innerHTML = `누적 타격: <span class="neon-text">${total.toLocaleString()}M</span>`;
+
+            if(charts.member) charts.member.destroy();
+            charts.member = new Chart(document.getElementById('chartMember'), { type: 'line', data: { labels: db.seasons.map(s => "시즌 " + s), datasets: [{ label: '개인 딜량', data: mDamages, borderColor: '#f472b6', backgroundColor: 'rgba(244, 114, 182, 0.2)', fill: true, tension: 0.4, borderWidth: 3 }] } });
+        }
+
+        // 탭 넘길 때마다 쫀득한 등장 효과 부여
+        document.querySelectorAll('button[data-bs-toggle="pill"]').forEach(btn => {
+            btn.addEventListener('shown.bs.tab', () => gsap.from(".tab-pane.active .glass-card", { y: 20, opacity: 0, duration: 0.5, stagger: 0.1, ease: "power2.out" }));
+        });
+    </script>
+</body>
+</html>
